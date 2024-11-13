@@ -1,3 +1,4 @@
+* [MongoDB Fundamentals](https://spiffy-lute-caa.notion.site/MongoDB-notes-13d81955c1dd80199281ff971253ffea) `note`
 * [MySQL Crash Course](https://nostarch.com/mysql-crash-course) by Rick Silva
 	* [ricksilva/mysql_cc](https://github.com/ricksilva/mysql_cc)
 * [SQL Cookbook, 2nd Edition](https://www.amazon.com/SQL-Cookbook-Query-Solutions-Techniques-dp-1492077445/dp/1492077445/) by Anthony Molinaro, Robert de Graaf
