@@ -1,3 +1,4 @@
+* [MongoDB Fundamentals](https://cafe-bytes.notion.site/MongoDB-notes-1897be29a71681ad8e30c2f36d4c5b3c) `note`
 * [MySQL Crash Course](https://nostarch.com/mysql-crash-course) by Rick Silva
 	* [ricksilva/mysql_cc](https://github.com/ricksilva/mysql_cc)
 * [SQL Cookbook, 2nd Edition](https://www.amazon.com/SQL-Cookbook-Query-Solutions-Techniques-dp-1492077445/dp/1492077445/) by Anthony Molinaro, Robert de Graaf
@@ -12,7 +13,7 @@
 	<img src="https://files.catbox.moe/5wdov3.png" alt="ultimate-sql">
 </a>
 
-### Contents at a Glance
+### Contents
 
 * Getting Started (25m)  
 * Retrieving Data from a Single Table (60m)  
