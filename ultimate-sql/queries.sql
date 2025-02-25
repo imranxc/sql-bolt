@@ -417,3 +417,71 @@ select
 from customers as c
 where c.points < 2000
 order by first_name;
+
+-- ================== Insert data ==================
+
+insert into customers values (default, "John", "Snow", "1991-01-01", null, "13th Street. 47 W 13th St", "Queens", "NY", 0);
+
+insert into shippers (name) values 
+    ("Shipper 1"),
+    ("Shipper 2"),
+    ("Shipper 3");
+
+-- Exercise
+-- Insert 3 rows in the product table
+insert into products (name, quantity_in_stock, unit_price) values
+    ("Wireless Mouse", 150, 24.99),
+    ("Bluetooth Headphones", 75, 59.99),
+    ("USB-C Charging Cable", 200, 9.99);
+
+update products set name = "Wireless Mouse and Keyboard" where product_id = 11;
+
+-- Insert data into multiple table (parent/child)
+insert into orders (customer_id, order_date, status) values 
+	(10, "1990-02-01", 1);
+insert into order_items (order_id, product_id, quantity, unit_price) values 
+	(last_insert_id(), 1, 2, 2.95)
+    (last_insert_id(), 2, 3, 3.95);
+
+-- copy data from one table to another
+-- NOTE: doesn't mark order_id as pk, no auto_increment
+create table order_archived as select * from orders;
+desc order_archived;
+
+-- copy specific data by using sub query
+truncate table order_archived;
+
+insert into order_archived
+select * from orders where order_date > "2018-01-01";
+
+-- Exercise
+use sql_invoicing;
+
+create table if not exists invoice_archived as
+    select i.invoice_id, i.number, c.name, i.invoice_total, i.payment_total, i.invoice_date, i.due_date, i.payment_date
+from invoices as i
+join clients as c using (client_id) 
+where i.payment_date is not null;
+
+select * from invoice_archived;
+
+use sql_store;
+
+-- Exercise
+-- write a sql statement to
+    -- give any customers born before 1990
+    -- 50 extra points
+update customers set points = (points + 50) where year(birth_date) < 1990;
+
+-- Exercise
+-- update customers comment as "Gold Customer" whose points are greater than 3000
+update orders set comments = "Gold Customer" 
+where customer_id in (
+    select customer_id from customers 
+    where points > 3000
+);
+
+use sql_invoicing;
+
+-- delete a record
+delete from invoices where invoice_id = 1;
