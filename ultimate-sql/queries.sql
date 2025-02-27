@@ -485,3 +485,113 @@ use sql_invoicing;
 
 -- delete a record
 delete from invoices where invoice_id = 1;
+
+-- ================== aggregate functions ==================
+
+-- To count all values, including nulls, use `count(*)` instead of `count(column)`, which only counts non-null values.
+use sql_invoicing;
+
+select
+    max(invoice_total) as highest,
+    min(invoice_total) as lowest,
+    avg(invoice_total) as average,
+    sum(invoice_total) as total,
+    count(*) as total_invoices
+from invoices;
+
+-- Exercise
+select
+    "First half of 2019" as date_range,
+    sum(invoice_total) as total_sales,
+    sum(payment_total) as total_payments,
+    sum(invoice_total - payment_total) as what_to_expect
+from invoices 
+where invoice_date between "2019-01-01" and "2019-06-30"
+    union 
+select
+    "Second half of 2019" as date_range,
+    sum(invoice_total) as total_sales,
+    sum(payment_total) as total_payments,
+    sum(invoice_total - payment_total) as what_to_expect
+from invoices 
+where invoice_date between "2019-07-01" and "2019-12-31"
+    union 
+select
+    "Total" as date_range,
+    sum(invoice_total) as total_sales,
+    sum(payment_total) as total_payments,
+    sum(invoice_total - payment_total) as what_to_expect
+from invoices 
+where invoice_date between "2019-01-01" and "2019-12-31";
+
+-- Group by clause
+select 
+    sum(invoice_total) as total_sales,
+    client_id
+from invoices 
+group by client_id
+order by total_sales desc;
+
+-- Exercise
+select 
+    p.date,
+    pm.name as payment_method_name,
+    sum(p.amount) as total_payments
+from payments as p 
+join payment_methods as pm 
+    on p.payment_method = pm.payment_method_id
+group by p.date, payment_method_name
+order by p.date;
+
+-- having clause
+
+-- `where` clause filter the data before `group by` clause, 
+-- `having` clause filter the data after `group by` clause.
+    -- allowed to use alias names
+use sql_invoicing;
+
+select 
+    client_id, 
+    sum(invoice_total) as total_sales,
+    count(*) as number_of_invoices
+from invoices
+group by client_id
+having total_sales > 500 and number_of_invoices > 5;
+
+-- Exercise
+-- Get the customers
+    -- located in Virginia
+    -- who have spent more than $100
+use sql_store;
+
+select
+    c.customer_id,
+    c.first_name,
+    c.last_name,
+    sum(oi.quantity * oi.unit_price) as total_sales
+from customers as c 
+join orders as o using (customer_id)
+join order_items as oi using (order_id)
+where state = "VA"
+group by
+    c.customer_id,
+    c.first_name,
+    c.last_name
+having total_sales > 100;
+
+-- Rollup (available only MySQL)
+-- it generates subtotal and grand total rows, which can introduce NULL values in grouped columns
+select
+    client_id,
+    sum(invoice_total) as total_sales
+from invoices
+group by client_id with rollup;
+
+-- Exercise
+-- with rollup, you can't use alias name in group by clause
+select
+    name as payment_method,
+    sum(amount) as total
+from payments join payment_methods
+on payment_method = payment_method_id
+group by name with rollup;
