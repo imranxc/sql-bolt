@@ -595,3 +595,173 @@ select
 from payments join payment_methods
 on payment_method = payment_method_id
 group by name with rollup;
+
+-- ================== Subqueries ==================
+
+-- find all products that are more expensive than lettuce (id=3)
+use sql_store;
+
+select * from products
+where unit_price > (
+    select unit_price 
+    from products 
+    where product_id = 3
+);
+
+-- Exercise
+-- in sql_hr database, find all employees who earn more than average
+use sql_hr;
+
+select * from employees
+where salary > (
+    select avg(salary)
+    from employees
+);
+
+-- find the products that never been ordered
+use sql_store;
+
+select * from products 
+where product_id not in (
+    select distinct product_id
+    from order_items
+);
+
+-- Exercise
+-- find clients without invoices
+use sql_invoicing;
+
+select * from clients 
+where client_id not in (
+    select distinct client_id 
+    from invoices
+);
+
+-- solved above problem using left join
+select clients.* from clients 
+left join invoices 
+using (client_id)
+where invoice_id is null;
+
+-- find customers who have ordered lettuce (id=3)
+-- select customer_id, first_name, last_name
+use sql_store;
+
+select 
+    c.customer_id, c.first_name, c.last_name 
+from customers as c
+where c.customer_id in (
+    select 
+        o.customer_id 
+    from order_items as oi 
+    join orders as o 
+    using (order_id) 
+    where product_id=3
+);
+
+-- solved above problem using join
+select 
+    distinct c.customer_id, c.first_name, c.last_name 
+from customers as c 
+join orders as o 
+using (customer_id) 
+join order_items as oi 
+using (order_id)
+where oi.product_id=3;
+
+-- Select invoices larger than all invoices of client 3
+use sql_invoicing;
+
+select * from invoices 
+where invoice_total > (
+    select max(invoice_total) 
+    from invoices 
+    where client_id=3
+);
+
+-- solved above problem using `ALL` keyword
+-- all is used to compare a value against all values returned by a subquery
+select * from invoices 
+where invoice_total > all (
+    select invoice_total 
+    from invoices 
+    where client_id=3
+);
+
+-- select clients with at least 2 invoices
+use sql_store;
+
+select * from clients 
+where client_id in (
+    select client_id
+    from invoices 
+    group by client_id 
+    having count(*) >= 2
+);
+
+-- solved above problem using `ANY` Keyword
+select * from clients 
+where client_id = any (
+    select client_id 
+    from invoices 
+    group by client_id 
+    having count(*) >= 2
+);
+
+-- co-related subquery
+    -- https://youtu.be/0d419Vo2Po4 [co related subquery]
+
+-- select employees whose salary is above the avg in their office
+
+-- pseudocode of the problem
+    -- for each employee
+    -- calculate the avg salary for employee.office
+    -- return the employee if salary > avg
+use sql_hr;
+
+select *
+from employees as e 
+where salary > (
+    select avg(salary)
+    from employees
+    where office_id = e.office_id
+);
+
+-- select clients that have invoices
+use sql_invoicing;
+
+select * from clients
+where client_id in (
+    select distinct client_id
+    from invoices
+);
+
+-- solved above problem using join
+select distinct clients.* from clients
+join invoices using (client_id)
+
+-- solved above problem using `exists` operator
+select * from clients
+where exists (
+    select client_id 
+    from invoices as i
+    where i.client_id = client_id
+);
+
+-- find the products that never been ordered
+use sql_store;
+
+select * from products as p 
+where not exists (
+    select product_id 
+    from order_items 
+    where product_id=p.product_id
+);
+
+-- subqueries in select clause
+select invoice_id, invoice_total, 
+    (select avg(invoice_total) 
+        from invoices
+    ) as invoice_average,
+    invoice_total - (select invoice_average) as difference
+from invoices;
