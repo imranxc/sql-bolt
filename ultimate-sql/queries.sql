@@ -765,3 +765,168 @@ select invoice_id, invoice_total,
     ) as invoice_average,
     invoice_total - (select invoice_average) as difference
 from invoices;
+
+-- ================== built in functions ==================
+
+-- Numeric functions
+-- https://dev.mysql.com/doc/refman/8.4/en/numeric-functions.html
+
+select rand(); -- random float value between 0 and 1
+
+select round(5.23); -- 5
+select round(5.2385, 2); -- 5.24
+
+select abs(-1.23); -- 1.23
+
+select ceiling(5.60); -- 6 [smallest integer >= current number]
+select floor(5.24); -- 5
+
+select truncate(5.9875, 3); -- 5.987
+
+-- String functions
+-- https://dev.mysql.com/doc/refman/8.4/en/string-functions.html
+
+select length("Sky"); -- 3
+
+select upper("sky"); -- SKY
+
+select lower("SKY"); -- sky
+
+select left("Kindergarten", 4); -- Kind
+
+select right("Kindergarten", 6); -- garten
+
+select substring("Kindergarten", 1, 5); -- Kinde | substring(string, start, length)
+select substring("Kindergarten", 1); -- Kindergarten
+select substring("Kindergarten", 50, 5); -- null
+
+select locate("rG", "Kindergarten"); -- 6 | return 1st position of the character, case insensitive
+select locate("X", "Kindergarten"); -- 0
+
+select replace("Kindergarten", "garten", "garden"); -- Kindergarden | replace(string, replaceValue, newValue)
+
+select concat("John", " ", "Doe"); -- John Doe
+
+use sql_store;
+
+select concat(first_name, " ", last_name) as full_name
+from customers order by first_name;
+
+-- Date function
+-- https://dev.mysql.com/doc/refman/8.4/en/date-and-time-functions.html
+
+select now(); -- return date & time
+select curdate(); -- 2025-03-08
+select curtime(); -- server's local time
+select utc_time(); -- GMT time
+
+select year(now()); -- 2025
+select month(now()); -- 03
+select date(now()); -- 2025-03-08
+
+select hour(now());
+select minute(now());
+select second(now());
+
+select dayname(now()); -- Saturday
+select monthname(now()); -- March
+
+select extract(month from now()); -- 3
+select extract(hour from now()); 
+
+-- Exercise
+-- remove the hard-coded year
+use sql_store;
+
+select *
+from orders 
+where order_date >= "2019-01-01";
+
+select *
+from orders
+where year(order_date) >= year(now());
+
+-- Date formatting
+-- https://dev.mysql.com/doc/refman/8.4/en/date-and-time-functions.html#function_date-format
+select date_format(now(), "%M %d %Y"); -- March 08 2025
+
+-- Time formatting
+-- https://dev.mysql.com/doc/refman/8.4/en/date-and-time-functions.html#function_time-format
+select time_format(now(), "%H:%i %p");
+
+-- add a date
+select date_add(now(), interval 1 year); -- 2026-03-08 05:19:47
+select date_add(date(now()), interval 2 year); -- 2027-03-08
+
+-- subtract a date
+select date_add(now(), interval -1 year); -- 2020-03-08 05:20:38
+select date_sub(now(), interval 1 year); -- 2020-03-08 05:21:13
+
+select datediff("2025-03-10", "2025-03-10") as diff; -- 2
+select datediff('2025-03-08', "2025-03-10") as diff; -- 2
+
+select time_to_sec("09:00"); -- 32400 (since midnight)
+
+-- Other functions
+use sql_store;
+
+select 
+    order_id, 
+    ifnull(shipper_id, "Not Assigned") as shipper
+from orders;
+
+-- if shipper_id is null then go to comments, if comments is null put not assigned
+-- it takes N number of parameters
+select 
+    order_id, 
+    coalesce(shipper_id, comments, "Not Assigned") as shipper
+from orders;
+
+-- Exercise
+-- Mark customer phone number as Unknown if it is null
+select
+    concat(first_name, " ", last_name) as customer,
+    ifnull(phone, "Unknown") as phone
+from customers;
+
+-- if function (expression, value, elseValue)
+select
+    order_id,
+    order_date,
+    if ((year(order_date) = "2019"), "Active", "Archive") as order_status
+from orders;
+
+-- Exercise
+-- How many times each product has been ordered
+select 
+    product_id, 
+    name, 
+    count(product_id) as orders,
+    if((count(product_id) > 1), "Many times", "Once") as frequency
+from products
+join order_items
+using (product_id)
+group by product_id, name;
+
+-- case operator
+select 
+	order_id,
+	case 
+		when year(order_date) = year(now()) then "Active"
+		when year(order_date) = year(now()) - 1 then "Last year"
+		when year(order_date) < year(now()) -1 then "Archived"
+        else "Future"
+	end as category
+from orders;
+
+-- Exercise
+select
+    concat(first_name, " ", last_name) as customer,
+    points, 
+    case 
+        when points > 3000 then "Gold"
+        when points between 2000 and 3000 then "Silver"
+        else "Bronze"
+    end as category
+from customers
+order by points desc;
