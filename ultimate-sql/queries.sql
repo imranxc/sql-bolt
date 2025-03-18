@@ -930,3 +930,86 @@ select
     end as category
 from customers
 order by points desc;
+
+-- ================== view ==================
+-- view is the result set of stored query
+-- it stores the query rather the result, that's why it called virtual table
+-- Advantages
+    -- to restrict data access
+    -- to make complex queries easy
+    -- to provide data independence
+    -- to present different views of the same data
+-- https://www.youtube.com/watch?v=m02JnTcfFfY
+
+-- syntax
+    -- create view view_name as 
+    -- select column_names from table1, table2 | multiple tables
+    -- where condition;
+
+use sql_invoicing;
+
+create view sales_by_client as
+select  
+    c.client_id,
+    c.name,
+    sum(i.invoice_total) as total_sales 
+from clients as c 
+join invoices as i 
+using (client_id)
+group by c.client_id, c.name;
+
+-- execute view as normal statement
+select * from sales_by_client;
+
+-- drop view 
+drop view sales_by_client;
+
+-- exercise
+-- create a view to see the balance for each client
+-- clients_balance as view
+    -- client_id
+    -- name
+    -- balance (invoice_total - payment_total)
+create or replace view clients_balance as 
+select 
+    c.client_id,
+    c.name,
+    sum(i.invoice_total - i.payment_total) as balance 
+from clients as c 
+join invoices as i 
+using (client_id)
+group by c.client_id, c.name;
+
+select * from clients_balance;
+
+-- NOTE: we can update/delete row from view as well only
+-- if the view doesn't contains
+	-- distinct keyword
+	-- aggregate functions
+	-- group by / having clause
+	-- union operator
+-- then this view called as updatable view
+create or replace view invoices_with_balance as 
+select 
+    invoice_id,
+    number,
+    client_id,
+    invoice_total,
+    payment_total,
+    invoice_total - payment_total as balance, -- new field
+    invoice_date,
+    due_date,
+    payment_date 
+from invoices
+where (invoice_total - payment_total) > 0 -- it is updatable
+with check option; -- this will prevent view to further modify
+
+-- delete a row in view
+delete from invoices_with_balance
+where invoice_id = 1;
+
+-- changes made in original table reflects view and vice versa
+-- update `due_date` column
+update invoices_with_balance 
+set due_date = date_add(due_date, interval 2 day)
+where invoice_id = 2;
