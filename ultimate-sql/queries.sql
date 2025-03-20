@@ -1013,3 +1013,202 @@ where invoice_id = 1;
 update invoices_with_balance 
 set due_date = date_add(due_date, interval 2 day)
 where invoice_id = 2;
+
+-- ============= store procedure/custom function =============
+    -- it is used to store and organize data
+use sql_store;
+
+create procedure get_clients() 
+begin
+    select * from clients;
+end;
+
+call get_clients();
+
+-- exercise
+-- create a procedure called `get_invoices_with_balance`
+-- to return all the invoices with balance > 0
+use sql_invoicing;
+
+delimiter $$ -- Specific only MySQL
+create procedure get_invoices_with_balance() 
+begin 
+    select * from invoices
+    where invoice_total - payment_total > 0;
+end $$
+delimiter ;
+
+call get_invoices_with_balance();
+
+-- OR
+
+create procedure get_invoices_with_balance2()
+begin
+    select * from invoices
+    where invoice_total - payment_total > 0;
+end;
+
+call get_invoices_with_balance2();
+
+-- drop store procedure
+drop procedure if exists get_invoices_with_balance2;
+
+-- store procedure with parameters
+create procedure get_clients_by_state(state varchar(5))
+begin
+    select * from clients as c
+    where c.state = state;
+end;
+
+call get_clients_by_state("CA");
+
+-- MySQL doesn't support default value for parameters
+create procedure get_clients_by_state2(state varchar(5))
+begin
+    if state is null then 
+        select * from clients;
+    else 
+        select * from clients as c
+        where c.state = state;
+    end if;
+end;
+
+-- shorter way
+create procedure get_clients_by_state2(state varchar(5))
+begin
+    select * from clients as c
+    where c.state = ifnull(state, c.state);
+end;
+
+call get_clients_by_state2(null); -- can't be empty
+
+-- Exercise
+-- write a store procedure to return invoices for a given client `get_invoices_by_client`
+create procedure get_invoices_by_client(id int)
+begin
+    select * from invoices 
+    where id = client_id;
+end;
+
+call get_invoices_by_client(2);
+
+-- Exercise
+-- Write a store procedure called `get_payments()` with 2 parameters
+create procedure get_payments(client_id int, payment_method_id tinyint) 
+begin 
+    select * from payments as p 
+    where p.client_id = ifnull(client_id, p.client_id)
+        and p.payment_method = ifnull(payment_method_id, p.payment_method);
+end;
+
+call get_payments(null, null);
+call get_payments(1, null);
+call get_payments(1, 2);
+
+-- parameter validation
+create procedure make_payments(
+    invoice_id int, 
+    payment_amount decimal(9, 2), 
+    payment_date date
+)
+begin 
+    if payment_amount <= 0 then 
+        signal sqlstate "22003" set message_text = "Invalid Payment Amount";
+    end if;
+
+    update invoices i 
+    set 
+        i.payment_total = payment_amount,
+        i.payment_date = payment_date
+    where i.invoice_id = invoice_id;
+end;
+
+call make_payments(2, 100, "2019-01-01");
+
+-- output parameters/return values
+set @invoice_count = 0;
+set @invoices_total = 0;
+
+create procedure get_unpaid_invoices_for_client(
+    in client_id int, 
+    out invoice_count int, 
+    out invoices_total decimal(9, 2)
+)
+begin
+    select 
+        count(*), 
+        sum(invoice_total)
+    into 
+        invoice_count, 
+        invoices_total
+    from invoices as i   
+    where i.client_id=client_id
+        and payment_total=0;
+end;
+
+call get_unpaid_invoices_for_client(3, @invoice_count, @invoices_total);
+
+-- retrieve the output value
+select @invoice_count as invoice_count, @invoices_total as invoices_total;
+
+-- variables
+-- user/session variables remain active until MySQL session is active
+set @variable_name = value;
+
+create procedure get_risk_factor()
+begin 
+    -- local variables for store procedure
+    declare risk_factor decimal(9, 2) default 0;
+    declare invoices_total decimal(9, 2);
+    declare invoice_count int;
+
+    select 
+        count(*),
+        sum(invoice_total)
+    into 
+        invoice_count,
+        invoices_total
+    from invoices;
+
+    set risk_factor = invoices_total/invoice_count*5;
+    select risk_factor;
+end;
+
+-- Stored procedures are executed with the `call` statement and 
+-- cannot be used directly in queries like function.
+call get_risk_factor();
+
+-- function returns only single value
+-- store procedure return multiple values
+create function get_risk_factor_for_client(client_id int)
+returns int
+
+-- attributes
+    -- deterministic [for x always return y]
+    -- reads sql data [select statement to read data]
+    -- modifies sql data [insert/update/delete statements]
+reads sql data 
+
+begin 
+    declare risk_factor decimal(9, 2) default 0;
+    declare invoices_total decimal(9, 2);
+    declare invoice_count int;
+
+    select 
+        count(*),
+        sum(invoice_total)
+    into 
+        invoice_count,
+        invoices_total
+    from invoices as i
+    where i.client_id = client_id;
+
+    set risk_factor = invoices_total/invoice_count*5;
+    return ifnull(risk_factor, 0);
+end;
+
+select 
+    client_id, 
+    name, 
+    get_risk_factor_for_client(client_id) as risk_factor
+from clients;
