@@ -1212,3 +1212,241 @@ select
     name, 
     get_risk_factor_for_client(client_id) as risk_factor
 from clients;
+
+-- ===================== Triggers & Events =====================
+-- a trigger is a block of SQL code that automatically gets executed before or after 
+-- an insert, update, or delete statement.
+use sql_invoicing;
+
+create trigger payments_after_insert
+    after insert on payments 
+    for each row 
+begin 
+    update invoices
+    set payment_total = payment_total + new.amount
+    where invoice_id = new.invoice_id; -- newly inserted row's id
+end;
+
+insert into payments values (DEFAULT, 5, 3, "2019-01-01", 10, 1);
+
+-- Exercise
+-- create a trigger that gets fired when we delete a payment
+create trigger payments_after_delete
+    after delete on payments 
+    for each row 
+begin  
+    update invoices 
+    set payment_total = payment_total - old.amount -- deleted row's amount
+    where invoice_id = old.invoice_id;
+end;
+
+delete from payments where payment_id = 9;
+
+-- return all triggers in a current database
+show triggers; 
+
+-- delete a trigger
+drop trigger if exists payments_after_insert;
+
+-- payments_audit table
+create table payments_audit (
+    client_id int primary key auto_increment,
+    date date not null,
+    amount decimal(9, 2) not null,
+    action_type varchar(50) not null,
+    action_date datetime not null
+);
+
+create trigger payments_after_insert
+    after insert on payments 
+    for each row 
+begin 
+    update invoices
+    set payment_total = payment_total + new.amount
+    where invoice_id = new.invoice_id; 
+
+    -- insert newly created row into payments_audit
+    insert into payments_audit
+    values (new.client_id, new.date, new.amount, "insert", now());
+end;
+
+insert into payments values (DEFAULT, 5, 3, "2019-01-01", 10, 1);
+
+create trigger payments_after_delete
+    after delete on payments 
+    for each row 
+begin  
+    update invoices 
+    set payment_total = payment_total - old.amount
+    where invoice_id = old.invoice_id;
+
+    -- insert newly deleted row into payments_audit
+    insert into payments_audit
+    values (old.client_id, old.date, old.amount, "delete", now());
+end;
+
+delete from payments where payment_id = 9;
+
+select * from payments_audit;
+
+-- events: a block of SQL code or task that gets executed according to schedule.
+show variables; -- all system variables
+show variables like "event%"; -- event_scheduler - ON
+
+-- if it is turned off, on it first
+show variables like "event%";
+set global event_scheduler=off; 
+
+create event yearly_delete_stale_audit_rows
+    on schedule 
+    -- at "2020-05-20" (for only once)
+    every 1 year starts "2020-05-20" ends "2029-05-20"
+do begin
+    delete from payments_audit
+        where action_date < now() - interval 1 year;
+end;
+
+-- view events
+show events;
+
+-- drop events
+drop events if exists yearly_delete_state_audit_rows;
+
+-- ===================== Transactions =====================
+-- A group of sql statements that represent a single unit of work.
+use sql_store;
+
+-- MySQL by default put all insert/update/delete statements inside transaction
+start transaction;
+    insert into orders(customer_id, order_date, status)
+    values (1, "2022-02-05", 1);
+
+    insert into order_items
+    values(last_insert_id(), 1, 1, 1);
+commit;
+rollback; -- manually error checking and for manually rollback 
+
+-- Concurrency Problems | https://youtu.be/oAWO9okhEUQ
+    -- lost updates
+    -- dirty reads
+    -- non repeating reads
+    -- phantom/ghosts reads
+
+-- ===================== Data types =====================
+/*
+INTEGER TYPES
+    - tinyint 1b [-128, 127]
+    - unsigned tinyint [0, 255]
+    - smallint 2b [-32k, 32k]
+    - mediumint 3b [-8m, 8m]
+    - int 4b [-2b, 2n]
+    - bigint 8b [-9z, 9z]
+STRING TYPES
+    - char(n) - fixed length string
+    - varchar(n) - variable length string
+    - tinytext [255]
+    - text [64kb]
+    - mediumtext [16mb]
+    - longtext [4gb]
+DECIMAL TYPES
+    - dec/numeric/fixed/decimal(precision, scale)
+        - decimal(9, 2) = 1234567.89
+    - float [4b]
+    - double [8b]
+BOOLEAN TYPES
+    - bool/boolean
+ENUM TYPES
+    - enum(...)
+- SET TYPES
+    - set
+- DATA and TIME TYPES
+    - date
+    - time
+    - datetime [8b]
+    - timestamp [4b - up to 2038]
+    - year
+BLOB TYPES (to store binary data)
+    - tinyblob [0, 255]
+    - blob [65kb]
+    - mediumblob [16mb]
+    - longblob [4gb]
+JSON TYPES
+*/
+
+use sql_store;
+
+-- add new json column call properties
+alter table products
+add column properties json null;
+
+UPDATE products
+SET properties = '
+{
+    "dimensions": [1, 2, 3],
+    "weight": 10,
+    "manufacturer": {
+        "name": "sony"
+    }
+}
+'
+WHERE product_id = 1;
+
+-- alternate way of write
+update products set properties = json_object(
+    "weight", 20,
+    "dimensions", json_array(1, 2, 3),
+    "manufacturer", json_object(
+        "name", "samsung"
+    )
+)
+where product_id = 2;
+
+select product_id, properties
+from products where properties is not null;
+
+-- extract individual property
+select product_id, json_extract(properties, '$.weight') as weight
+from products where properties is not null;
+
+-- shorter way
+select product_id, properties -> '$.dimensions' as dimensions
+from products where properties is not null;
+
+select product_id, properties -> '$.dimensions[2]' as dimension
+from products where properties is not null;
+
+-- nested json object
+select product_id, properties -> '$.manufacturer.name' as manufacturer
+from products where properties is not null;
+
+-- to remove "" from property
+select product_id, properties ->> '$.manufacturer.name' as company
+from products where properties is not null;
+
+-- update/set new json property
+update products set properties = json_set(
+    properties,
+    '$.manufacturer', json_object(
+        "name", "samsung",
+        "country", "south korea"
+    ),
+        "$.weight", 200
+    )
+where product_id = 2;
+
+select 
+    product_id, 
+    properties
+from products where product_id = 2;
+
+-- remove property
+update products set properties = json_remove(
+    properties,
+        '$.manufacturer.country'
+    )
+where product_id = 2;
+
+select 
+    product_id, 
+    properties -> '$.manufacturer'
+from products where product_id = 2;
