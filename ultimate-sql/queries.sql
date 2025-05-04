@@ -1450,3 +1450,56 @@ select
     product_id, 
     properties -> '$.manufacturer'
 from products where product_id = 2;
+
+-- ===================== Database Design =====================
+-- Advice - https://youtu.be/wgw7fu4588M
+create database if not exists school;
+use school;
+
+create table students (
+    student_id int not null primary key auto_increment,
+    first_name varchar(50) not null,
+    last_name varchar(50) not null,
+    email varchar(100) not null unique,
+    date_registered datetime default current_timestamp
+);
+
+create table instructors (
+    instructor_id int not null primary key auto_increment,
+    name varchar(50) not null
+);
+
+create table tags (
+    tag_id int not null primary key auto_increment,
+    name varchar(50) not null
+);
+
+create table courses (
+    course_id int not null primary key auto_increment,
+    title varchar(255) not null,
+    price decimal(5, 2) not null,
+    instructor int not null,
+
+    foreign key (instructor) references instructors(instructor_id)
+);
+
+-- child
+create table enrollments (
+    enrollment_id int not null primary key auto_increment,
+    student int not null,
+    course int not null,
+    date datetime default current_timestamp,
+    price decimal(5, 2) not null,
+
+    foreign key (student) references students(student_id),
+    foreign key (course) references courses(course_id)
+);
+
+create table course_tags (
+    course_tag_id int not null primary key auto_increment,
+    tag int not null,
+    course int not null,
+
+    foreign key (tag) references tags(tag_id),
+    foreign key (course) references courses(course_id)
+);
