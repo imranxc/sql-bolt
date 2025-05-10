@@ -1477,10 +1477,12 @@ create table tags (
 create table courses (
     course_id int not null primary key auto_increment,
     title varchar(255) not null,
-    price decimal(5, 2) not null,
+    price decimal(5, 2) not null check (price >= 0),
     instructor int not null,
 
-    foreign key (instructor) references instructors(instructor_id)
+    foreign key fk_courses_instructors (instructor) 
+        references instructors(instructor_id) 
+        on update cascade on delete no action 
 );
 
 -- child
@@ -1489,10 +1491,16 @@ create table enrollments (
     student int not null,
     course int not null,
     date datetime default current_timestamp,
-    price decimal(5, 2) not null,
+    price decimal(5, 2) not null check (price >= 0),
 
-    foreign key (student) references students(student_id),
-    foreign key (course) references courses(course_id)
+    foreign key fk_enrollments_students (student) 
+        references students(student_id)
+        on update cascade on delete no action,
+    foreign key fk_enrollments_courses (course) 
+        references courses(course_id)
+        on update cascade on delete no action,
+    
+    constraint uq_enrollment unique (student, course)
 );
 
 create table course_tags (
@@ -1500,6 +1508,126 @@ create table course_tags (
     tag int not null,
     course int not null,
 
-    foreign key (tag) references tags(tag_id),
-    foreign key (course) references courses(course_id)
+    foreign key fk_tags (tag)
+        references tags(tag_id)
+        on update cascade on delete no action,
+    foreign key fk_courses_tags (course) 
+        references courses(course_id)
+        on update cascade on delete no action,
+    
+    constraint uq_course_tag unique (tag, course)
 );
+
+-- create database
+create database if not exists sql_store2;
+
+-- drop database
+drop database if exists sql_store2;
+
+-- create table
+create table if not exists customers (
+    customer_id int primary key auto_increment,
+    first_name varchar(50) not null,
+    points int not null default 0,
+    city varchar(100) not null,
+    email varchar(50) not null unique
+);
+
+alter table customers
+add last_name varchar(50) not null after first_name,
+drop points,
+modify column first_name varchar(100) not null;
+
+create table if not exists orders (
+    order_id int primary key auto_increment,
+    customer_id int not null,
+
+    foreign key fk_orders_customers (customer_id) 
+        references customers (customer_id)
+        on update cascade on delete no action
+);
+
+-- ===================== Indexing =====================
+-- Design index based on queries not tables.
+create index idx_state on customers(state);
+
+explain select customer_id, concat(first_name, " ", last_name) as full_name
+from customers where state="CA";
+
+-- write a query to find customers with more than 1000 points
+explain select customer_id from customers where points > 1000;
+
+-- with index
+create index idx_points on customers(points);
+explain select customer_id from customers where points > 1000;
+
+-- view all indexes
+show indexes in customers; -- primary, idx_points, idx_state
+show indexes in orders; -- FK is also part of index for quick joining
+
+-- string as index
+-- column(chars) optionals for char and varchar but compulsory for blob and text
+create index idx_lastName on customers (last_name (20));
+
+-- full-text index
+create database sql_blog;
+
+create table if not exists posts (
+    post_id int primary key auto_increment,
+    title varchar(255) not null,
+    body text not null,
+    date_published datetime default current_timestamp
+);
+
+insert into 
+    posts (title, body, date_published)
+values
+    ('Understanding Recursion', 'Recursion is a method of solving problems where a function calls itself as a subroutine.', '2024-11-01 10:15:00'),
+    ('Introduction to Python', 'Python is a versatile programming language that is great for beginners and professionals alike.', '2024-11-03 14:30:00'),
+    ('What is Object-Oriented Programming?', 'OOP is a programming paradigm based on the concept of "objects", which can contain data and code.', '2024-11-05 09:45:00'),
+    ('JavaScript Asynchronous Programming', 'Async programming in JavaScript allows you to perform long network requests without blocking the main thread.', '2024-11-07 11:20:00'),
+    ('Getting Started with Git', 'Git is a distributed version control system used to track changes in source code during software development.', '2024-11-10 08:00:00'),
+    ('SQL Basics: SELECT Statement', 'The SELECT statement is used to query the database and retrieve data from one or more tables.', '2024-11-12 16:00:00'),
+    ('REST vs. GraphQL APIs', 'REST and GraphQL are two approaches to building APIs; each has its own strengths and use cases.', '2024-11-14 13:10:00'),
+    ('Why Learn Data Structures?', 'Data structures like arrays, stacks, and trees help you organize data efficiently for better performance.', '2024-11-16 17:25:00'),
+    ('Building a Simple CRUD App', 'CRUD stands for Create, Read, Update, Delete – the four basic operations of persistent storage.', '2024-11-18 10:10:00'),
+    ('Understanding Big O Notation', 'Big O notation is used to classify algorithms according to how their run time or space requirements grow.', '2024-11-20 15:45:00');
+
+use sql_blog;
+
+-- old way
+-- find the posts with "javascript recursion" in body or title
+select * from posts 
+where title like "%javascript recursion%" or 
+    body like "%javascript recursion%";
+
+create fulltext index idx_title_body on posts(title, body);
+select * from posts 
+where match(title, body) against ("javascript recursion");
+
+-- result actually sorted based on relevant score (between 0 and 1)
+select
+    *,
+    match(title, body) against ("javascript recursion") as score
+from posts 
+where match(title, body) against ("javascript recursion");
+
+-- it has 2 modes, natural (default) and boolean
+select * from posts 
+where match(title, body) against ("javascript -recursion" in boolean mode); -- react not redux
+where match(title, body) against ("javascript -recursion +function" in boolean mode); -- function must be included
+
+-- search exact phrase
+select * from posts 
+where match(title, body) against ("'Big O notation'");
+
+use sql_store;
+
+-- composite index
+create index idx_state_points on customers (state, points);
+select customer_id from customers 
+where points > 1000 and state = "CA";
+
+show indexes in customers;
+
+drop index idx_state_points on customers;
